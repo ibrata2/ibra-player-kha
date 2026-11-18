@@ -114,7 +114,9 @@ jobs:
             sleep 1
             adb exec-out screencap -p > shots/8-rename-dialog.png
             adb shell input tap 251 255
-            sleep 3
+            sleep 1
+            adb exec-out screencap -p > shots/8b-after-ok.png
+            sleep 2
             adb shell input keyevent KEYCODE_BACK
             sleep 2
             adb exec-out screencap -p > shots/9-renamed.png
