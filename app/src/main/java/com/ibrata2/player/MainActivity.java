@@ -1618,7 +1618,12 @@ public final class MainActivity extends Activity {
         });
         LinearLayout.LayoutParams wlp = new LinearLayout.LayoutParams(-1, 0, 1f);
         wlp.setMargins(px(8), 0, px(8), px(8));
-        browserView.addView(web, wlp);
+        webFrame = new FrameLayout(this);
+        webFrame.addView(web, new FrameLayout.LayoutParams(-1, -1));
+        browserView.addView(webFrame, wlp);
+        webColor = color;
+        askKey = null;
+        askCard = null;
         content.addView(browserView, new FrameLayout.LayoutParams(-1, -1));
         web.loadUrl(url);
         updateGrab();
@@ -1641,6 +1646,10 @@ public final class MainActivity extends Activity {
 
     private void updateGrab() {
         if (webGrab == null || web == null) return;
+        // ask once the page has had a moment to show the video
+        ui.removeCallbacks(askLater);
+        if (isMediaPage(web.getUrl())) ui.postDelayed(askLater, 1200);
+        else hideAsk();
         boolean ok = isMediaPage(web.getUrl());
         webGrab.setAlpha(ok ? 1f : 0.45f);
     }
@@ -1649,11 +1658,151 @@ public final class MainActivity extends Activity {
         if (web == null) return;
         String u = web.getUrl();
         if (!isMediaPage(u)) { toast(Tr.t("dl.openVideoFirst")); return; }
-        web.onPause();   // stop the page's own playback
-        dlUrl = u;
-        dlInfo = null;
-        closeBrowser();
-        dlFetch();
+        askKey = mediaKey(u);
+        askDeclined.remove(askKey);
+        showAskChoices(u);
+    }
+
+    // ---- "Download this?" card that floats over the page while the video keeps playing
+    private FrameLayout webFrame;
+    private LinearLayout askCard;
+    private String askKey;                 // the video the card is about
+    private final java.util.Set<String> askDeclined = new java.util.HashSet<>();
+    private int webColor;
+    private boolean askAudio = true;
+    private final Runnable askLater = this::maybeAsk;
+
+    /** Same video = same key, whatever extra parameters the site adds (time, playlist…). */
+    private static String mediaKey(String url) {
+        if (url == null) return "";
+        Uri u = Uri.parse(url);
+        String host = u.getHost() == null ? "" : u.getHost();
+        String v = null;
+        try { v = u.getQueryParameter("v"); } catch (Exception ignored) { }
+        if (v != null) return "yt:" + v;
+        String path = u.getPath() == null ? "" : u.getPath();
+        if (host.contains("youtu.be")) return "yt:" + path.replace("/", "");
+        if (path.startsWith("/shorts/") || path.startsWith("/live/")) return "yt:" + path.substring(path.indexOf('/', 1) + 1);
+        return host + path;
+    }
+
+    private void maybeAsk() {
+        if (web == null || webFrame == null) return;
+        String url = web.getUrl();
+        if (!isMediaPage(url)) { hideAsk(); return; }
+        String key = mediaKey(url);
+        if (key.equals(askKey) || askDeclined.contains(key)) return;
+        askKey = key;
+        showAskQuestion(url);
+    }
+
+    private void hideAsk() {
+        if (askCard != null && webFrame != null) webFrame.removeView(askCard);
+        askCard = null;
+    }
+
+    private LinearLayout newAskCard() {
+        hideAsk();
+        askCard = new LinearLayout(this);
+        askCard.setOrientation(LinearLayout.VERTICAL);
+        askCard.setBackground(g.panel(px(22), dp, 120));
+        askCard.setPadding(px(18), px(14), px(18), px(14));
+        askCard.setElevation(px(12));
+        askCard.setClickable(true);   // touches on the card stay on the card; the rest of the page stays usable
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-1, -2, Gravity.CENTER);
+        lp.setMargins(px(18), 0, px(18), 0);
+        webFrame.addView(askCard, lp);
+        return askCard;
+    }
+
+    private void showAskQuestion(String url) {
+        LinearLayout c = newAskCard();
+        LinearLayout head = new LinearLayout(this);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        ImageView ic = new ImageView(this);
+        ic.setImageDrawable(new Icon("download", 0xFFFFFFFF));
+        ic.setBackground(g.pill(webColor, px(20)));
+        int p = px(8);
+        ic.setPadding(p, p, p, p);
+        head.addView(ic, new LinearLayout.LayoutParams(px(40), px(40)));
+        TextView q = text(Tr.t("ask.q"), 18, g.text, true);
+        q.setPadding(px(12), 0, 0, 0);
+        head.addView(q, new LinearLayout.LayoutParams(0, -2, 1f));
+        c.addView(head);
+        c.addView(text(Tr.t("ask.hint"), 13, g.muted, false));
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER);
+        View yes = button(Tr.t("ask.yes"), true, v -> showAskChoices(url));
+        View no = button(Tr.t("ask.no"), false, v -> { askDeclined.add(mediaKey(url)); hideAsk(); });
+        LinearLayout.LayoutParams l1 = new LinearLayout.LayoutParams(0, -2, 1f);
+        l1.setMargins(0, px(12), px(6), 0);
+        LinearLayout.LayoutParams l2 = new LinearLayout.LayoutParams(0, -2, 1f);
+        l2.setMargins(px(6), px(12), 0, 0);
+        row.addView(yes, l1);
+        row.addView(no, l2);
+        c.addView(row);
+    }
+
+    private void showAskChoices(String url) {
+        LinearLayout c = newAskCard();
+        TextView wait = text(Tr.t("dl.fetching"), 16, g.text, true);
+        c.addView(wait);
+        android.widget.ProgressBar spin = new android.widget.ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        spin.setIndeterminate(true);
+        spin.setIndeterminateTintList(android.content.res.ColorStateList.valueOf(webColor));
+        c.addView(spin, new LinearLayout.LayoutParams(-1, px(10)));
+        c.addView(button(Tr.t("dl.cancel"), false, v -> hideAsk()));
+        final LinearLayout mine = c;
+        YtDl.prepare(this);
+        Runnable go = () -> YtDl.fetch(url, (info, err) -> {
+            if (askCard != mine || web == null) return;   // user moved on
+            if (info == null) {
+                LinearLayout e = newAskCard();
+                e.addView(text(Tr.t("dl.fetchFailed"), 16, g.text, true));
+                e.addView(text(err == null ? "" : shortErr(err), 13, g.accent, false));
+                e.addView(button(Tr.t("close"), false, v -> hideAsk()));
+                return;
+            }
+            renderAskChoices(info);
+        });
+        if (YtDl.state == YtDl.READY) go.run(); else waitEngine(go, 0);
+    }
+
+    private void renderAskChoices(YtDl.Info info) {
+        LinearLayout c = newAskCard();
+        LinearLayout head = new LinearLayout(this);
+        head.setGravity(Gravity.CENTER_VERTICAL);
+        TextView t = text(info.title, 15, g.text, true);
+        t.setMaxLines(2);
+        t.setEllipsize(TextUtils.TruncateAt.END);
+        head.addView(t, new LinearLayout.LayoutParams(0, -2, 1f));
+        ImageButton x = iconButton("close", g.text, 40);
+        x.setOnClickListener(v -> hideAsk());
+        head.addView(x);
+        c.addView(head);
+        c.addView(chipRow(new String[]{"♪  " + Tr.t("dl.audio"), "▶  " + Tr.t("dl.video")}, askAudio ? 0 : 1, i -> {
+            askAudio = i == 0;
+            renderAskChoices(info);
+        }));
+        ScrollView sv = new ScrollView(this);
+        LinearLayout list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        sv.addView(list);
+        for (YtDl.Choice ch : askAudio ? info.audio : info.video) {
+            View r = choiceRow(ch);
+            r.setOnClickListener(v -> {
+                YtDl.enqueue(this, info, ch);
+                LinearLayout done = newAskCard();
+                TextView ok = text("✓  " + Tr.t("dl.started"), 17, g.text, true);
+                done.addView(ok);
+                done.addView(text(Tr.t("ask.started"), 13, g.muted, false));
+                ui.postDelayed(() -> { if (askCard == done) hideAsk(); }, 2500);
+            });
+            list.addView(r);
+        }
+        int maxH = webFrame.getHeight() > 0 ? (int) (webFrame.getHeight() * 0.55f) : px(320);
+        int rows = (askAudio ? info.audio : info.video).size();
+        c.addView(sv, new LinearLayout.LayoutParams(-1, Math.min(maxH, rows * px(64))));
     }
 
     private void closeBrowser() {
@@ -1667,6 +1816,9 @@ public final class MainActivity extends Activity {
         browserView = null;
         webTitle = null;
         webGrab = null;
+        ui.removeCallbacks(askLater);
+        askCard = null;
+        webFrame = null;
         if (dlView != null) dlView.setVisibility(View.VISIBLE);
     }
 
@@ -1730,7 +1882,7 @@ public final class MainActivity extends Activity {
         if (YtDl.state == YtDl.FAILED || tries > 240) {
             dlFetching = false;
             dlError = YtDl.stateError;
-            if ("downloads".equals(tab)) showDownloads();
+            if ("downloads".equals(tab) && web == null) showDownloads();
             return;
         }
         ui.postDelayed(() -> waitEngine(then, tries + 1), 500);

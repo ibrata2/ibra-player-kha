@@ -59,6 +59,11 @@ final class Tr {
         p("crashTitle", "The app closed last time — here is why", "البرنامج انغلق المرة الفاتت — هذا السبب");
         p("crashCopy", "Copy", "نسخ");
         p("crashCopied", "Copied. Send it to the developer.", "انتسخ. ابعثه للمبرمج.");
+        p("ask.q", "Download this?", "تريد تحمّل هذا؟");
+        p("ask.hint", "You can keep playing it to check first — the page still works.", "تكدر تشغّله وتسمعه حتى تتأكد أولاً، الصفحة تبقى تشتغل.");
+        p("ask.yes", "Yes", "نعم");
+        p("ask.no", "No", "لا");
+        p("ask.started", "Find it in the Downloads tab. You can keep browsing.", "تلكاه بقسم التحميل. وتكدر تكمّل تصفّح.");
         // downloads
         p("downloads", "Downloads", "التحميل");
         p("dl.title", "Download from YouTube", "التحميل من يوتيوب");

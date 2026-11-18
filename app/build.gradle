@@ -10,8 +10,8 @@ android {
         applicationId 'com.ibrata2.playerkha'
         minSdk 24
         targetSdk 35
-        versionCode 3
-        versionName '1.0.2'
+        versionCode 4
+        versionName '1.0.3'
     }
 
     // One small APK per processor type instead of one huge APK for all of them.
