@@ -139,6 +139,7 @@ public final class MainActivity extends Activity {
     // ------------------------------------------------------------------ lifecycle
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
+        installCrashLog();
         prefs = new Prefs(this);
         Tr.setArabic(prefs.arabic());
         pendingAutoplay = getIntent().getBooleanExtra(EXTRA_AUTOPLAY, false);
@@ -146,6 +147,52 @@ public final class MainActivity extends Activity {
         takeShared(getIntent());
         buildUi();
         requestPermissionsIfNeeded();
+        showLastCrash();
+    }
+
+    /** If the app ever closes by itself, keep the reason and show it on the next start. */
+    private void installCrashLog() {
+        java.io.File f = new java.io.File(getFilesDir(), "crash.txt");
+        Thread.UncaughtExceptionHandler prev = Thread.getDefaultUncaughtExceptionHandler();
+        if (prev != null && prev.getClass().getName().contains("MainActivity")) return;
+        Thread.setDefaultUncaughtExceptionHandler((t, e) -> {
+            try (java.io.PrintWriter w = new java.io.PrintWriter(new java.io.FileWriter(f))) {
+                String ver = "";
+                try { ver = getPackageManager().getPackageInfo(getPackageName(), 0).versionName; } catch (Exception ignored) { }
+                w.println("Ibra Player Kha " + ver + " · Android " + Build.VERSION.RELEASE + " (API " + Build.VERSION.SDK_INT + ") · " + Build.MANUFACTURER + " " + Build.MODEL);
+                e.printStackTrace(w);
+            } catch (Exception ignored) { }
+            if (prev != null) prev.uncaughtException(t, e);
+        });
+    }
+
+    private void showLastCrash() {
+        java.io.File f = new java.io.File(getFilesDir(), "crash.txt");
+        if (!f.exists()) return;
+        String txt;
+        try { txt = new String(java.nio.file.Files.readAllBytes(f.toPath()), "UTF-8"); } catch (Exception e) { txt = ""; }
+        //noinspection ResultOfMethodCallIgnored
+        f.delete();
+        if (txt.isEmpty()) return;
+        final String report = txt.length() > 3000 ? txt.substring(0, 3000) : txt;
+        TextView tv = new TextView(this);
+        tv.setText(report);
+        tv.setTextSize(11);
+        tv.setTextIsSelectable(true);
+        tv.setTextDirection(View.TEXT_DIRECTION_LTR);
+        tv.setPadding(px(16), px(8), px(16), px(8));
+        ScrollView sv = new ScrollView(this);
+        sv.addView(tv);
+        new AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+                .setTitle(Tr.t("crashTitle"))
+                .setView(sv)
+                .setPositiveButton(Tr.t("crashCopy"), (d, w) -> {
+                    android.content.ClipboardManager cm = (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                    if (cm != null) cm.setPrimaryClip(android.content.ClipData.newPlainText("crash", report));
+                    toast(Tr.t("crashCopied"));
+                })
+                .setNegativeButton(Tr.t("close"), null)
+                .show();
     }
 
     /** "Share" from YouTube / browser, or a tap on the download notification. */

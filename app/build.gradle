@@ -10,8 +10,8 @@ android {
         applicationId 'com.ibrata2.playerkha'
         minSdk 24
         targetSdk 35
-        versionCode 2
-        versionName '1.0.1'
+        versionCode 3
+        versionName '1.0.2'
     }
 
     // One small APK per processor type instead of one huge APK for all of them.
@@ -19,7 +19,7 @@ android {
         abi {
             enable true
             reset()
-            include 'armeabi-v7a', 'arm64-v8a'
+            include 'armeabi-v7a', 'arm64-v8a', 'x86_64'   // x86_64 is only for the automatic emulator test
             universalApk false
         }
     }

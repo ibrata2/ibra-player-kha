@@ -56,6 +56,9 @@ final class Tr {
         p("error", "Cannot play this file", "تعذّر تشغيل هذا الملف");
         p("resumed", "Resumed", "تم الاستئناف");
         p("unknownArtist", "Unknown artist", "فنان غير معروف");
+        p("crashTitle", "The app closed last time — here is why", "البرنامج انغلق المرة الفاتت — هذا السبب");
+        p("crashCopy", "Copy", "نسخ");
+        p("crashCopied", "Copied. Send it to the developer.", "انتسخ. ابعثه للمبرمج.");
         // downloads
         p("downloads", "Downloads", "التحميل");
         p("dl.title", "Download from YouTube", "التحميل من يوتيوب");
