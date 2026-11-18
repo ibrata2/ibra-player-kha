@@ -113,6 +113,17 @@ jobs:
             adb shell input text "Renamed"
             sleep 1
             adb exec-out screencap -p > shots/8-rename-dialog.png
+            adb shell input tap 251 255
+            sleep 3
+            adb shell input keyevent KEYCODE_BACK
+            sleep 2
+            adb exec-out screencap -p > shots/9-renamed.png
+            adb shell ls -la /sdcard/Music/ > shots/files-after-rename.txt
+            adb shell input tap 40 121
+            sleep 2
+            adb shell input tap 230 460
+            sleep 2
+            adb exec-out screencap -p > shots/10-delete-confirm.png
             adb shell input keyevent KEYCODE_BACK
             adb shell am start -n com.ibrata2.playerkha/com.ibrata2.player.MainActivity --es tab playlists
             sleep 3
