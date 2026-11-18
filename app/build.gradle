@@ -1,0 +1,77 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.ibrata2.player'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'com.ibrata2.playerkha'
+        minSdk 24
+        targetSdk 35
+        versionCode 1
+        versionName '1.0.0'
+    }
+
+    // One small APK per processor type instead of one huge APK for all of them.
+    splits {
+        abi {
+            enable true
+            reset()
+            include 'armeabi-v7a', 'arm64-v8a'
+            universalApk false
+        }
+    }
+
+    // One permanent key for every build, so new versions install over old ones.
+    def signingProps = new Properties()
+    def signingFile = rootProject.file('keystore/signing.properties')
+    if (signingFile.exists()) signingFile.withInputStream { signingProps.load(it) }
+
+    signingConfigs {
+        release {
+            storeFile rootProject.file(signingProps.getProperty('storeFile', 'keystore/ibra-player-kha.jks'))
+            storePassword signingProps.getProperty('storePassword')
+            keyAlias signingProps.getProperty('keyAlias', 'ibraplayerkha')
+            keyPassword signingProps.getProperty('keyPassword')
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            shrinkResources false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+    }
+
+    packaging {
+        jniLibs { useLegacyPackaging true }
+    }
+}
+
+def media3 = '1.8.0'
+dependencies {
+    implementation "androidx.media3:media3-exoplayer:$media3"
+    implementation "androidx.media3:media3-session:$media3"
+    implementation "androidx.media3:media3-ui:$media3"
+    // FFmpeg audio decoder (AC-3, E-AC-3, DTS, TrueHD, MP2, ALAC, FLAC...) for units whose chip lacks them
+    implementation "org.jellyfin.media3:media3-ffmpeg-decoder:1.8.0+1"
+    implementation 'androidx.recyclerview:recyclerview:1.4.0'
+    implementation 'androidx.core:core:1.16.0'
+    implementation 'androidx.annotation:annotation-experimental:1.4.1'
+    // yt-dlp + ffmpeg for the YouTube downloader
+    implementation 'io.github.junkfood02.youtubedl-android:library:0.18.1'
+    implementation 'io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1'
+}
