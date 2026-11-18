@@ -59,7 +59,13 @@ final class Tr {
         // downloads
         p("downloads", "Downloads", "التحميل");
         p("dl.title", "Download from YouTube", "التحميل من يوتيوب");
-        p("dl.link", "Video link", "رابط الفيديو");
+        p("dl.open", "Open and download", "افتح وحمّل");
+        p("dl.ytSub", "Open YouTube, pick a video, tap Download", "افتح يوتيوب، اختار الفيديو، واضغط تحميل");
+        p("dl.openHint", "Open any site, play the video or song you want, then tap the Download button at the top.",
+                "افتح أي موقع، روح للفيديو أو الأغنية اللي تريدها، وبعدين اضغط زر التحميل فوق.");
+        p("dl.grab", "Download", "تحميل");
+        p("dl.openVideoFirst", "Open a video or a song first", "افتح فيديو أو أغنية أولاً");
+        p("dl.link", "Or paste a link", "أو الصق الرابط");
         p("dl.paste", "Paste", "لصق");
         p("dl.fetch", "Show qualities", "عرض الجودات");
         p("dl.fetching", "Reading the video…", "جاري قراءة الفيديو…");

@@ -72,7 +72,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Ibra Player Kha for car head units, phones and tablets.
+ * Ibra Player Kha for phones and tablets.
  * Layout adapts to any screen: 7" 1024×600, 10" 1280×720, ultra-wide 1920×720,
  * portrait "Tesla-style" screens and phones. Touch, rotary/D-pad and steering-wheel keys.
  */
@@ -209,9 +209,10 @@ public final class MainActivity extends Activity {
 
     @Override public void onBackPressed() {
         if (playerVisible) { showPlayer(false); return; }
+        if (web != null) { if (web.canGoBack()) web.goBack(); else closeBrowser(); return; }
         if (openFolder != null) { openFolder = null; refreshList(); return; }
         if (!"videos".equals(tab)) { selectTab("videos"); return; }
-        moveTaskToBack(true);   // keep music playing, like a car player should
+        moveTaskToBack(true);   // keep music playing in the background
     }
 
     // ------------------------------------------------------------------ permissions & scan
@@ -274,17 +275,33 @@ public final class MainActivity extends Activity {
         boolean landscape = wDp >= hDp;
         boolean compact = Math.min(wDp, hDp) < 420;   // 1024×600 @ 1.5x etc.
 
-        getWindow().setStatusBarColor(Color.BLACK);
+        edgeToEdge();
         getWindow().getDecorView().setLayoutDirection(Tr.isArabic() ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
 
         settingsView = null;
         dlView = null;
+        if (web != null) { web.destroy(); web = null; browserView = null; }
         lastArtId = null;
         root = new FrameLayout(this);
         root.setBackground(g.backdrop());
         LinearLayout shell = new LinearLayout(this);
         shell.setOrientation(landscape ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL);
         root.addView(shell, new FrameLayout.LayoutParams(-1, -1));
+        this.shell = shell;
+        root.setOnApplyWindowInsetsListener((v, in) -> {
+            int l, t, r, b;
+            if (Build.VERSION.SDK_INT >= 30) {
+                android.graphics.Insets sb = in.getInsets(android.view.WindowInsets.Type.systemBars() | android.view.WindowInsets.Type.displayCutout());
+                android.graphics.Insets ime = in.getInsets(android.view.WindowInsets.Type.ime());
+                l = sb.left; t = sb.top; r = sb.right; b = Math.max(sb.bottom, ime.bottom);
+            } else {
+                l = in.getSystemWindowInsetLeft(); t = in.getSystemWindowInsetTop();
+                r = in.getSystemWindowInsetRight(); b = in.getSystemWindowInsetBottom();
+            }
+            insets[0] = l; insets[1] = t; insets[2] = r; insets[3] = b;
+            applyInsets();
+            return in;
+        });
 
         // ---- navigation (rail on the side in landscape, bar at the bottom in portrait)
         nav = new LinearLayout(this);
@@ -318,9 +335,49 @@ public final class MainActivity extends Activity {
         buildLibrary(compact, wDp);
         buildPlayer(compact);
         setContentView(root);
+        root.requestApplyInsets();
+        applyInsets();
         selectTab(tab);
         if (scanned) refreshList();
         if (controller != null) refreshPlayerState();
+    }
+
+    private LinearLayout shell;
+    private final int[] insets = new int[4];
+
+    /** Draw behind the status / navigation bars, then keep our own content clear of them. */
+    private void edgeToEdge() {
+        android.view.Window w = getWindow();
+        w.setStatusBarColor(Color.TRANSPARENT);
+        w.setNavigationBarColor(Color.TRANSPARENT);
+        if (Build.VERSION.SDK_INT >= 29) { w.setNavigationBarContrastEnforced(false); w.setStatusBarContrastEnforced(false); }
+        if (Build.VERSION.SDK_INT >= 30) {
+            w.setDecorFitsSystemWindows(false);
+            android.view.WindowInsetsController c = w.getInsetsController();
+            if (c != null) {
+                int light = android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS | android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
+                c.setSystemBarsAppearance(g.dark ? 0 : light, light);
+            }
+        } else {
+            int f = View.SYSTEM_UI_FLAG_LAYOUT_STABLE | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN;
+            if (!g.dark) f |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+            if (!g.dark && Build.VERSION.SDK_INT >= 26) f |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+            w.getDecorView().setSystemUiVisibility(f);
+        }
+    }
+
+    private void applyInsets() {
+        if (shell != null) shell.setPadding(insets[0], insets[1], insets[2], insets[3]);
+        if (pTop != null && pTop.getLayoutParams() instanceof FrameLayout.LayoutParams) {
+            FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) pTop.getLayoutParams();
+            lp.setMargins(px(10) + insets[0], px(10) + insets[1], px(10) + insets[2], 0);
+            pTop.setLayoutParams(lp);
+        }
+        if (pBottom != null && pBottom.getLayoutParams() instanceof FrameLayout.LayoutParams) {
+            FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) pBottom.getLayoutParams();
+            lp.setMargins(px(10) + insets[0], 0, px(10) + insets[2], px(10) + insets[3]);
+            pBottom.setLayoutParams(lp);
+        }
     }
 
     private LinearLayout.LayoutParams navParams(boolean landscape) {
@@ -347,6 +404,7 @@ public final class MainActivity extends Activity {
     }
 
     private void selectTab(String id) {
+        if (web != null) closeBrowser();
         tab = id;
         openFolder = null;
         for (int i = 0; i < nav.getChildCount(); i++) {
@@ -1177,41 +1235,9 @@ public final class MainActivity extends Activity {
         for (int i = 0; i < names.length; i++) { names[i] = Tr.t("t." + Glass.IDS[i]); if (Glass.IDS[i].equals(prefs.theme())) cur = i; }
         theme.addView(chipRow(names, cur, i -> { prefs.setTheme(Glass.IDS[i]); rebuildKeepingTab(); }));
 
-        LinearLayout keys = section(col, Tr.t("steering"));
-        TextView hint = text(Tr.t("steeringHint"), 14, g.muted, false);
-        keys.addView(hint);
-        for (Map.Entry<Integer, String> e : prefs.customKeys().entrySet()) {
-            keys.addView(text("• " + KeyEvent.keyCodeToString(e.getKey()).replace("KEYCODE_", "") + "  →  " + Tr.t("a." + e.getValue()), 15, g.text, false));
-        }
-        LinearLayout kb = new LinearLayout(this);
-        kb.addView(button(Tr.t("learn"), true, v -> startLearning()));
-        kb.addView(button(Tr.t("resetKeys"), false, v -> { prefs.resetKeys(); showSettings(); }));
-        keys.addView(kb);
-
-        // Global capture through accessibility (works with units that only send keys to the app in front)
-        boolean acc = KeyCaptureService.isEnabled(this);
-        TextView accState = text(Tr.t("globalCapture") + ": " + Tr.t(acc ? "enabled" : "disabled"), 16, acc ? g.accent : g.text, true);
-        accState.setPadding(0, px(14), 0, px(2));
-        keys.addView(accState);
-        keys.addView(text(Tr.t("globalCaptureHint"), 13, g.muted, false));
-        keys.addView(button(Tr.t(acc ? "globalCaptureManage" : "globalCaptureEnable"), !acc, v -> {
-            try { startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)); }
-            catch (Exception ex) { toast(Tr.t("globalCaptureHint")); }
-            toast(Tr.t("globalCaptureFind"));
-        }));
-
-        // Live button test: shows the last button and the channel it came through
-        TextView testTitle = text(Tr.t("buttonTest"), 16, g.text, true);
-        testTitle.setPadding(0, px(14), 0, px(2));
-        keys.addView(testTitle);
-        lastKeyView = text(KeyBus.lastEvent.isEmpty() ? Tr.t("pressAny") : KeyBus.lastEvent, 18, g.accent, true);
-        keys.addView(lastKeyView);
-        keys.addView(text(Tr.t("unitTip"), 13, g.muted, false));
-
         LinearLayout play = section(col, Tr.t("playback"));
         play.addView(toggle(Tr.t("resumeOnOpen"), "resumeOnOpen", true));
         play.addView(toggle(Tr.t("rememberPos"), "rememberPos", true));
-        play.addView(toggle(Tr.t("autoStart"), "autoStart", false));
         play.addView(toggle(Tr.t("keepScreen"), "keepScreen", true));
 
         LinearLayout subs = section(col, Tr.t("subtitles"));
@@ -1295,6 +1321,9 @@ public final class MainActivity extends Activity {
         col.addView(text(Tr.t("dl.title"), 24, g.text, true));
         dlEngine = text("", 13, g.muted, false);
         col.addView(dlEngine);
+
+        // ---- ready buttons: YouTube first, then music sites
+        sitesBox(col);
 
         // ---- link box
         LinearLayout box = section(col, Tr.t("dl.link"));
@@ -1401,6 +1430,194 @@ public final class MainActivity extends Activity {
         dlSeen = -1;
         tickDownloads();
         if (dlAutoFetch) { dlAutoFetch = false; dlFetch(); }
+    }
+
+    // ------------------------------------------------------------------ built-in browser for YouTube & music sites
+    /** id, name, home page, colour, glyph */
+    private static final Object[][] SITES = {
+            {"youtube", "YouTube", "https://m.youtube.com/", 0xFFFF0033, "play"},
+            {"ytmusic", "YouTube Music", "https://music.youtube.com/", 0xFFC4122F, "music"},
+            {"soundcloud", "SoundCloud", "https://m.soundcloud.com/", 0xFFFF5500, "music"},
+            {"audiomack", "Audiomack", "https://audiomack.com/", 0xFFF29E0C, "music"},
+            {"bandcamp", "Bandcamp", "https://bandcamp.com/", 0xFF1A9AB8, "music"},
+            {"mixcloud", "Mixcloud", "https://www.mixcloud.com/", 0xFF5B3CF5, "music"},
+    };
+
+    private LinearLayout browserView;
+    private android.webkit.WebView web;
+    private TextView webTitle;
+    private TextView webGrab;
+
+    private View sitesBox(LinearLayout col) {
+        LinearLayout box = section(col, Tr.t("dl.open"));
+        // YouTube first: one big tile
+        box.addView(siteTile(SITES[0], true));
+        // other music sites: two per row
+        LinearLayout row = null;
+        for (int i = 1; i < SITES.length; i++) {
+            if (row == null || row.getChildCount() == 2) {
+                row = new LinearLayout(this);
+                box.addView(row, new LinearLayout.LayoutParams(-1, -2));
+            }
+            View t = siteTile(SITES[i], false);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -2, 1f);
+            lp.setMargins(row.getChildCount() == 0 ? 0 : px(4), px(8), row.getChildCount() == 0 ? px(4) : 0, 0);
+            row.addView(t, lp);
+        }
+        box.addView(text(Tr.t("dl.openHint"), 13, g.muted, false));
+        return box;
+    }
+
+    private View siteTile(Object[] site, boolean big) {
+        int color = (int) site[3];
+        LinearLayout t = new LinearLayout(this);
+        t.setGravity(Gravity.CENTER_VERTICAL);
+        t.setFocusable(true);
+        t.setClickable(true);
+        t.setPadding(px(big ? 16 : 10), px(big ? 12 : 8), px(12), px(big ? 12 : 8));
+        t.setMinimumHeight(px(big ? 72 : 56));
+        android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                new int[]{color, (color & 0x00FFFFFF) | 0xB0000000});
+        bg.setCornerRadius(px(18));
+        t.setBackground(bg);
+        ImageView badge = new ImageView(this);
+        badge.setImageDrawable(new Icon((String) site[4], color));
+        badge.setBackground(g.pill(0xFFFFFFFF, px(big ? 20 : 16)));
+        int p = px(big ? 9 : 7);
+        badge.setPadding(p, p, p, p);
+        int bs = px(big ? 44 : 34);
+        t.addView(badge, new LinearLayout.LayoutParams(bs, bs));
+        LinearLayout tx = new LinearLayout(this);
+        tx.setOrientation(LinearLayout.VERTICAL);
+        tx.setPadding(px(12), 0, px(4), 0);
+        TextView name = text((String) site[1], big ? 20 : 15, 0xFFFFFFFF, true);
+        name.setMaxLines(1);
+        name.setEllipsize(TextUtils.TruncateAt.END);
+        tx.addView(name);
+        if (big) tx.addView(text(Tr.t("dl.ytSub"), 13, 0xE6FFFFFF, false));
+        t.addView(tx, new LinearLayout.LayoutParams(0, -2, 1f));
+        if (big) {
+            ImageView arrow = new ImageView(this);
+            arrow.setImageDrawable(new Icon("download", 0xFFFFFFFF));
+            t.addView(arrow, new LinearLayout.LayoutParams(px(28), px(28)));
+        }
+        t.setOnClickListener(v -> openBrowser((String) site[2], (String) site[1], color));
+        return t;
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private void openBrowser(String url, String name, int color) {
+        closeBrowser();
+        if (dlView != null) dlView.setVisibility(View.GONE);
+        browserView = new LinearLayout(this);
+        browserView.setOrientation(LinearLayout.VERTICAL);
+
+        LinearLayout bar = new LinearLayout(this);
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        bar.setBackground(g.panel(px(18), dp, 30));
+        bar.setPadding(px(4), px(4), px(6), px(4));
+        ImageButton close = iconButton("close", g.text, 48);
+        close.setContentDescription(Tr.t("close"));
+        close.setOnClickListener(v -> closeBrowser());
+        bar.addView(close);
+        ImageButton back = iconButton("back", g.text, 48);
+        back.setContentDescription(Tr.t("back"));
+        if (Tr.isArabic()) back.setRotationY(180);
+        back.setOnClickListener(v -> { if (web != null && web.canGoBack()) web.goBack(); });
+        bar.addView(back);
+        webTitle = text(name, 15, g.text, true);
+        webTitle.setSingleLine(true);
+        webTitle.setEllipsize(TextUtils.TruncateAt.END);
+        webTitle.setPadding(px(6), 0, px(6), 0);
+        bar.addView(webTitle, new LinearLayout.LayoutParams(0, -2, 1f));
+        webGrab = text("⬇  " + Tr.t("dl.grab"), 15, 0xFFFFFFFF, true);
+        webGrab.setGravity(Gravity.CENTER);
+        webGrab.setMinHeight(px(46));
+        webGrab.setPadding(px(16), 0, px(16), 0);
+        webGrab.setBackground(g.pill(color, px(23)));
+        webGrab.setFocusable(true);
+        webGrab.setClickable(true);
+        webGrab.setOnClickListener(v -> grabFromBrowser());
+        bar.addView(webGrab);
+        LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(-1, -2);
+        blp.setMargins(px(8), px(8), px(8), px(6));
+        browserView.addView(bar, blp);
+
+        web = new android.webkit.WebView(this);
+        android.webkit.WebSettings ws = web.getSettings();
+        ws.setJavaScriptEnabled(true);
+        ws.setDomStorageEnabled(true);
+        ws.setMediaPlaybackRequiresUserGesture(true);
+        ws.setLoadWithOverviewMode(true);
+        ws.setUseWideViewPort(true);
+        web.setBackgroundColor(Color.BLACK);
+        web.setWebViewClient(new android.webkit.WebViewClient() {
+            @Override public boolean shouldOverrideUrlLoading(android.webkit.WebView v, android.webkit.WebResourceRequest r) {
+                String s = r.getUrl().getScheme();
+                // stay inside the app: ignore "open in YouTube app" / intent:// links
+                return !("http".equals(s) || "https".equals(s));
+            }
+            @Override public void doUpdateVisitedHistory(android.webkit.WebView v, String u, boolean reload) { updateGrab(); }
+            @Override public void onPageFinished(android.webkit.WebView v, String u) { updateGrab(); }
+        });
+        web.setWebChromeClient(new android.webkit.WebChromeClient() {
+            @Override public void onReceivedTitle(android.webkit.WebView v, String title) {
+                if (webTitle != null && title != null && !title.isEmpty()) webTitle.setText(title);
+            }
+        });
+        LinearLayout.LayoutParams wlp = new LinearLayout.LayoutParams(-1, 0, 1f);
+        wlp.setMargins(px(8), 0, px(8), px(8));
+        browserView.addView(web, wlp);
+        content.addView(browserView, new FrameLayout.LayoutParams(-1, -1));
+        web.loadUrl(url);
+        updateGrab();
+    }
+
+    /** Is the page a single video / song (not the home page or a search)? */
+    private static boolean isMediaPage(String url) {
+        if (url == null) return false;
+        Uri u = Uri.parse(url);
+        String host = u.getHost() == null ? "" : u.getHost();
+        String path = u.getPath() == null ? "" : u.getPath();
+        if (host.contains("youtube.com") || host.contains("youtu.be")) {
+            return host.contains("youtu.be") || u.getQueryParameter("v") != null || path.startsWith("/shorts/") || path.startsWith("/live/");
+        }
+        if (host.contains("bandcamp.com")) return path.contains("/track/") || path.contains("/album/");
+        int depth = 0;
+        for (String seg : path.split("/")) if (!seg.isEmpty()) depth++;
+        return depth >= 2 && !path.startsWith("/search") && !path.startsWith("/discover");
+    }
+
+    private void updateGrab() {
+        if (webGrab == null || web == null) return;
+        boolean ok = isMediaPage(web.getUrl());
+        webGrab.setAlpha(ok ? 1f : 0.45f);
+    }
+
+    private void grabFromBrowser() {
+        if (web == null) return;
+        String u = web.getUrl();
+        if (!isMediaPage(u)) { toast(Tr.t("dl.openVideoFirst")); return; }
+        web.onPause();   // stop the page's own playback
+        dlUrl = u;
+        dlInfo = null;
+        closeBrowser();
+        dlFetch();
+    }
+
+    private void closeBrowser() {
+        if (browserView != null) content.removeView(browserView);
+        if (web != null) {
+            web.stopLoading();
+            web.onPause();
+            web.destroy();
+        }
+        web = null;
+        browserView = null;
+        webTitle = null;
+        webGrab = null;
+        if (dlView != null) dlView.setVisibility(View.VISIBLE);
     }
 
     private View choiceRow(YtDl.Choice c) {
