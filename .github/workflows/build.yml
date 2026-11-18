@@ -93,7 +93,7 @@ jobs:
             python3 -c "import wave,struct,math; w=wave.open('t.wav','wb'); w.setnchannels(1); w.setsampwidth(2); w.setframerate(8000); w.writeframes(b''.join(struct.pack('<h',int(8000*math.sin(i/9))) for i in range(80000))); w.close()"
             adb push t.wav "/sdcard/Music/Test song.wav"
             adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d "file:///sdcard/Music/Test%20song.wav" || true
-            adb shell content call --uri content://media/external/file --method scan_volume --arg external_primary || true
+            adb shell appops set com.ibrata2.playerkha MANAGE_EXTERNAL_STORAGE allow || true
             sleep 4
             adb shell am start -n com.ibrata2.playerkha/com.ibrata2.player.MainActivity --es tab music
             sleep 3
