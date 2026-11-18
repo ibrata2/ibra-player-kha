@@ -108,6 +108,11 @@ jobs:
             adb shell input swipe 180 121 180 121 1200
             sleep 2
             adb exec-out screencap -p > shots/6b-longpress.png
+            adb shell input tap 230 365
+            sleep 2
+            adb shell input text "Renamed"
+            sleep 1
+            adb exec-out screencap -p > shots/8-rename-dialog.png
             adb shell input keyevent KEYCODE_BACK
             adb shell am start -n com.ibrata2.playerkha/com.ibrata2.player.MainActivity --es tab playlists
             sleep 3
