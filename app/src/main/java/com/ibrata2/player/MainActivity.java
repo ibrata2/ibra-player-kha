@@ -1536,13 +1536,13 @@ public final class MainActivity extends Activity {
         badge.setBackground(g.pill(0xFFFFFFFF, px(big ? 20 : 16)));
         int p = px(big ? 9 : 7);
         badge.setPadding(p, p, p, p);
-        int bs = px(big ? 44 : 34);
+        int bs = px(big ? 44 : 30);
         t.addView(badge, new LinearLayout.LayoutParams(bs, bs));
         LinearLayout tx = new LinearLayout(this);
         tx.setOrientation(LinearLayout.VERTICAL);
-        tx.setPadding(px(12), 0, px(4), 0);
-        TextView name = text((String) site[1], big ? 20 : 15, 0xFFFFFFFF, true);
-        name.setMaxLines(1);
+        tx.setPadding(px(big ? 12 : 8), 0, px(2), 0);
+        TextView name = text((String) site[1], big ? 20 : 14, 0xFFFFFFFF, true);
+        name.setMaxLines(2);
         name.setEllipsize(TextUtils.TruncateAt.END);
         tx.addView(name);
         if (big) tx.addView(text(Tr.t("dl.ytSub"), 13, 0xE6FFFFFF, false));
@@ -1916,7 +1916,7 @@ public final class MainActivity extends Activity {
         if (dlEngine != null) {
             String st;
             switch (YtDl.state) {
-                case YtDl.READY: st = "yt-dlp " + YtDl.engineVersion(this); break;
+                case YtDl.READY: st = YtDl.engineVersion(this); break;
                 case YtDl.FAILED: st = Tr.t("dl.engineFailed") + " " + YtDl.stateError; break;
                 default: st = Tr.t("dl.preparing");
             }

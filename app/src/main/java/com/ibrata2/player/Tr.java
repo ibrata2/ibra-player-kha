@@ -27,7 +27,7 @@ final class Tr {
         p("favorites", "Favorites", "المفضلة");
         p("settings", "Settings", "الإعدادات");
         p("search", "Search…", "بحث…");
-        p("empty", "No media found yet.\nPlug in a USB drive or SD card, then tap Rescan.", "لا توجد وسائط بعد.\nأدخل فلاشة أو كارت ذاكرة ثم اضغط إعادة الفحص.");
+        p("empty", "No media found yet.\nDownload something from the Downloads tab, or tap Rescan.", "ماكو فيديو أو أغاني بعد.\nحمّل من قسم التحميل، أو اضغط إعادة الفحص.");
         p("rescan", "Rescan", "إعادة الفحص");
         p("permission", "Allow access to videos and music", "اسمح بالوصول إلى الفيديو والموسيقى");
         p("grant", "Allow", "سماح");

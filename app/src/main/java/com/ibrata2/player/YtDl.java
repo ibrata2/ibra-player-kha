@@ -120,7 +120,11 @@ final class YtDl {
     }
 
     static String engineVersion(Context ctx) {
-        try { String v = YoutubeDL.getInstance().versionName(ctx.getApplicationContext()); return v == null ? "" : v; }
+        try {
+            String v = YoutubeDL.getInstance().versionName(ctx.getApplicationContext());
+            if (v == null) return "yt-dlp";
+            return v.startsWith("yt-dlp") ? v : "yt-dlp " + v;
+        }
         catch (Throwable e) { return ""; }
     }
 
