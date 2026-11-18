@@ -322,7 +322,7 @@ public final class MainActivity extends Activity {
         boolean landscape = wDp >= hDp;
         boolean compact = Math.min(wDp, hDp) < 420;   // 1024×600 @ 1.5x etc.
 
-        edgeToEdge();
+        try { edgeToEdge(); } catch (Exception ignored) { }
         getWindow().getDecorView().setLayoutDirection(Tr.isArabic() ? View.LAYOUT_DIRECTION_RTL : View.LAYOUT_DIRECTION_LTR);
 
         settingsView = null;
@@ -382,6 +382,7 @@ public final class MainActivity extends Activity {
         buildLibrary(compact, wDp);
         buildPlayer(compact);
         setContentView(root);
+        try { edgeToEdge(); } catch (Exception ignored) { }
         root.requestApplyInsets();
         applyInsets();
         selectTab(tab);
@@ -395,12 +396,14 @@ public final class MainActivity extends Activity {
     /** Draw behind the status / navigation bars, then keep our own content clear of them. */
     private void edgeToEdge() {
         android.view.Window w = getWindow();
+        w.getDecorView();   // the window's views must exist before the bar controller is asked for
         w.setStatusBarColor(Color.TRANSPARENT);
         w.setNavigationBarColor(Color.TRANSPARENT);
         if (Build.VERSION.SDK_INT >= 29) { w.setNavigationBarContrastEnforced(false); w.setStatusBarContrastEnforced(false); }
         if (Build.VERSION.SDK_INT >= 30) {
             w.setDecorFitsSystemWindows(false);
-            android.view.WindowInsetsController c = w.getInsetsController();
+            android.view.WindowInsetsController c = null;
+            try { c = w.getDecorView().getWindowInsetsController(); } catch (Exception ignored) { }
             if (c != null) {
                 int light = android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS | android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
                 c.setSystemBarsAppearance(g.dark ? 0 : light, light);
