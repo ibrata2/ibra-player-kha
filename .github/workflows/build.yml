@@ -90,6 +90,23 @@ jobs:
             adb shell input swipe 500 1500 500 400 300
             sleep 2
             adb exec-out screencap -p > shots/3-downloads-scrolled.png
+            python3 -c "import wave,struct,math; w=wave.open('t.wav','wb'); w.setnchannels(1); w.setsampwidth(2); w.setframerate(8000); w.writeframes(b''.join(struct.pack('<h',int(8000*math.sin(i/9))) for i in range(80000))); w.close()"
+            adb push t.wav "/sdcard/Music/Test song.wav"
+            adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d "file:///sdcard/Music/Test%20song.wav" || true
+            adb shell content call --uri content://media/external/file --method scan_volume --arg external_primary || true
+            sleep 4
+            adb shell am start -n com.ibrata2.playerkha/com.ibrata2.player.MainActivity --es tab music
+            sleep 3
+            adb shell input tap 1000 300
+            sleep 4
+            adb exec-out screencap -p > shots/5-music.png
+            adb shell input swipe 540 420 540 420 900
+            sleep 2
+            adb exec-out screencap -p > shots/6-item-menu.png
+            adb shell input keyevent KEYCODE_BACK
+            adb shell am start -n com.ibrata2.playerkha/com.ibrata2.player.MainActivity --es tab playlists
+            sleep 3
+            adb exec-out screencap -p > shots/7-playlists.png
             adb shell monkey -p com.ibrata2.playerkha --pct-syskeys 0 --throttle 150 -s 42 400 || true
             sleep 3
             adb exec-out screencap -p > shots/4-after-monkey.png

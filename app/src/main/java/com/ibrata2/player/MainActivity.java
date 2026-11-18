@@ -203,13 +203,14 @@ public final class MainActivity extends Activity {
             String u = YtDl.extractUrl(i.getStringExtra(Intent.EXTRA_TEXT));
             if (u != null) { dlUrl = u; dlAutoFetch = true; dlInfo = null; tab = "downloads"; return true; }
         }
-        if ("downloads".equals(i.getStringExtra(EXTRA_TAB))) { tab = "downloads"; return true; }
+        String want = i.getStringExtra(EXTRA_TAB);
+        if (want != null && java.util.Arrays.asList("videos", "music", "downloads", "folders", "playlists", "settings").contains(want)) { tab = want; return true; }
         return false;
     }
 
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
-        if (takeShared(intent)) { if (playerVisible) showPlayer(false); selectTab("downloads"); return; }
+        if (takeShared(intent)) { if (playerVisible) showPlayer(false); selectTab(tab); return; }
         if (Intent.ACTION_VIEW.equals(intent.getAction()) && intent.getData() != null) {
             pendingViewUri = intent.getData();
             if (controller != null) playPendingUri();
