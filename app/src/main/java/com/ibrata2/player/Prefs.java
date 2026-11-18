@@ -138,4 +138,110 @@ final class Prefs {
         } catch (JSONException ignored) { }
     }
     void resetKeys() { sp.edit().remove("keys").apply(); }
+
+    // ---- user playlists: [{"name": "...", "items": [[uri, title, video, path], ...]}, ...]
+    private JSONArray playlistsJson() {
+        try { return new JSONArray(sp.getString("playlists", "[]")); } catch (JSONException e) { return new JSONArray(); }
+    }
+    private void savePlaylists(JSONArray a) { sp.edit().putString("playlists", a.toString()).apply(); }
+
+    List<String> playlistNames() {
+        List<String> out = new ArrayList<>();
+        JSONArray a = playlistsJson();
+        for (int i = 0; i < a.length(); i++) out.add(a.optJSONObject(i).optString("name"));
+        return out;
+    }
+
+    private int playlistIndex(JSONArray a, String name) {
+        for (int i = 0; i < a.length(); i++) if (name.equals(a.optJSONObject(i).optString("name"))) return i;
+        return -1;
+    }
+
+    /** @return false if a playlist with that name already exists */
+    boolean createPlaylist(String name) {
+        JSONArray a = playlistsJson();
+        if (playlistIndex(a, name) >= 0) return false;
+        try { a.put(new JSONObject().put("name", name).put("items", new JSONArray())); } catch (JSONException ignored) { }
+        savePlaylists(a);
+        return true;
+    }
+
+    boolean renamePlaylist(String from, String to) {
+        JSONArray a = playlistsJson();
+        int i = playlistIndex(a, from);
+        if (i < 0 || (!from.equals(to) && playlistIndex(a, to) >= 0)) return false;
+        try { a.optJSONObject(i).put("name", to); } catch (JSONException ignored) { }
+        savePlaylists(a);
+        return true;
+    }
+
+    void deletePlaylist(String name) {
+        JSONArray a = playlistsJson(), b = new JSONArray();
+        for (int i = 0; i < a.length(); i++) if (!name.equals(a.optJSONObject(i).optString("name"))) b.put(a.optJSONObject(i));
+        savePlaylists(b);
+    }
+
+    List<String[]> playlist(String name) {
+        List<String[]> out = new ArrayList<>();
+        JSONArray a = playlistsJson();
+        int i = playlistIndex(a, name);
+        if (i < 0) return out;
+        JSONArray items = a.optJSONObject(i).optJSONArray("items");
+        for (int k = 0; items != null && k < items.length(); k++) {
+            JSONArray r = items.optJSONArray(k);
+            out.add(new String[]{r.optString(0), r.optString(1), r.optString(2, "0"), r.optString(3, "")});
+        }
+        return out;
+    }
+
+    /** @return false if it was already in the playlist */
+    boolean addToPlaylist(String name, String uri, String title, boolean video, String path) {
+        JSONArray a = playlistsJson();
+        int i = playlistIndex(a, name);
+        if (i < 0) return false;
+        JSONArray items = a.optJSONObject(i).optJSONArray("items");
+        for (int k = 0; k < items.length(); k++) if (uri.equals(items.optJSONArray(k).optString(0))) return false;
+        JSONArray r = new JSONArray();
+        r.put(uri); r.put(title); r.put(video ? "1" : "0"); r.put(path == null ? "" : path);
+        items.put(r);
+        savePlaylists(a);
+        return true;
+    }
+
+    void removeFromPlaylist(String name, String uri) {
+        JSONArray a = playlistsJson();
+        int i = playlistIndex(a, name);
+        if (i < 0) return;
+        JSONArray items = a.optJSONObject(i).optJSONArray("items"), keep = new JSONArray();
+        for (int k = 0; k < items.length(); k++) if (!uri.equals(items.optJSONArray(k).optString(0))) keep.put(items.optJSONArray(k));
+        try { a.optJSONObject(i).put("items", keep); } catch (JSONException ignored) { }
+        savePlaylists(a);
+    }
+
+    /** A file was renamed or deleted: fix it everywhere it is remembered (newUri == null means deleted). */
+    void replaceEverywhere(String oldUri, String newUri, String newTitle, String newPath) {
+        JSONArray a = playlistsJson();
+        for (int i = 0; i < a.length(); i++) {
+            JSONArray items = a.optJSONObject(i).optJSONArray("items"), keep = new JSONArray();
+            for (int k = 0; items != null && k < items.length(); k++) {
+                JSONArray r = items.optJSONArray(k);
+                if (!oldUri.equals(r.optString(0))) { keep.put(r); continue; }
+                if (newUri == null) continue;
+                JSONArray n = new JSONArray();
+                n.put(newUri); n.put(newTitle); n.put(r.optString(2, "0")); n.put(newPath == null ? "" : newPath);
+                keep.put(n);
+            }
+            try { a.optJSONObject(i).put("items", keep); } catch (JSONException ignored) { }
+        }
+        savePlaylists(a);
+        for (String key : new String[]{"recent", "fav"}) {
+            List<String[]> l = list(key);
+            for (int i = l.size() - 1; i >= 0; i--) {
+                if (!l.get(i)[0].equals(oldUri)) continue;
+                if (newUri == null) l.remove(i); else l.set(i, new String[]{newUri, newTitle, l.get(i)[2]});
+            }
+            saveList(key, l);
+        }
+        sp.edit().remove("pos:" + oldUri).apply();
+    }
 }

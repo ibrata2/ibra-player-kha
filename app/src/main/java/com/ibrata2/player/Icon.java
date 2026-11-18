@@ -107,6 +107,10 @@ final class Icon extends Drawable {
                 c.drawRoundRect(new RectF(5, 5, 19, 21), 2.5f, 2.5f, stroke);
                 c.drawRoundRect(new RectF(8.5f, 3, 15.5f, 7), 1.5f, 1.5f, fill);
                 c.drawLine(8.5f, 12, 15.5f, 12, stroke); c.drawLine(8.5f, 16, 13.5f, 16, stroke); break;
+            case "more":
+                c.drawCircle(12, 5.5f, 1.9f, fill); c.drawCircle(12, 12, 1.9f, fill); c.drawCircle(12, 18.5f, 1.9f, fill); break;
+            case "plus":
+                c.drawLine(12, 5, 12, 19, stroke); c.drawLine(5, 12, 19, 12, stroke); break;
             case "close":
                 c.drawLine(6, 6, 18, 18, stroke); c.drawLine(18, 6, 6, 18, stroke); break;
             default:

@@ -18,6 +18,7 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.MediaStore;
 import android.provider.Settings;
 import android.text.Editable;
 import android.text.TextUtils;
@@ -258,6 +259,7 @@ public final class MainActivity extends Activity {
         if (playerVisible) { showPlayer(false); return; }
         if (web != null) { if (web.canGoBack()) web.goBack(); else closeBrowser(); return; }
         if (openFolder != null) { openFolder = null; refreshList(); return; }
+        if (openList != null) { openList = null; refreshList(); return; }
         if (!"videos".equals(tab)) { selectTab("videos"); return; }
         moveTaskToBack(true);   // keep music playing in the background
     }
@@ -366,7 +368,7 @@ public final class MainActivity extends Activity {
             nav.addView(logo, lp);
         }
         String[][] tabs = {{"videos", "video"}, {"music", "music"}, {"downloads", "download"}, {"folders", "folder"},
-                {"recent", "recent"}, {"favorites", "star"}, {"settings", "settings"}};
+                {"playlists", "queue"}, {"settings", "settings"}};
         for (String[] t : tabs) nav.addView(navButton(t[0], t[1], landscape, compact), navParams(landscape));
 
         content = new FrameLayout(this);
@@ -455,6 +457,7 @@ public final class MainActivity extends Activity {
 
     private void selectTab(String id) {
         if (web != null) closeBrowser();
+        if (!id.equals(tab)) openList = null;
         tab = id;
         openFolder = null;
         for (int i = 0; i < nav.getChildCount(); i++) {
@@ -481,6 +484,7 @@ public final class MainActivity extends Activity {
             case "favorites": return "star";
             case "settings": return "settings";
             case "downloads": return "download";
+            case "playlists": return "queue";
             default: return "video";
         }
     }
@@ -606,18 +610,20 @@ public final class MainActivity extends Activity {
                         if (query.isEmpty() || f.name.toLowerCase(Locale.ROOT).contains(query.toLowerCase(Locale.ROOT))) rows.add(Row.folder(f));
                 }
                 break;
-            case "recent":
-            case "favorites": {
-                title = Tr.t(tab);
-                List<String[]> src = prefs.list("recent".equals(tab) ? "recent" : "fav");
-                List<MediaRepo.Item> items = new ArrayList<>();
-                for (String[] r : src) {
-                    MediaRepo.Item it = find(r[0]);
-                    if (it == null) { it = new MediaRepo.Item(); it.uri = r[0]; it.title = r[1]; it.sub = ""; it.video = "1".equals(r[2]); }
-                    items.add(it);
+            case "playlists": {
+                if (openList != null) {
+                    title = listTitle(openList);
+                    rows.add(Row.back());
+                    List<MediaRepo.Item> f = MediaRepo.filter(listItems(openList), query);
+                    for (int i = 0; i < f.size(); i++) { Row r = Row.item(f.get(i), f, i, false); r.owner = openList; rows.add(r); }
+                } else {
+                    title = Tr.t("playlists");
+                    rows.add(Row.newList());
+                    rows.add(Row.list(FAV));
+                    rows.add(Row.list(RECENT));
+                    for (String n : prefs.playlistNames())
+                        if (query.isEmpty() || n.toLowerCase(Locale.ROOT).contains(query.toLowerCase(Locale.ROOT))) rows.add(Row.list(n));
                 }
-                List<MediaRepo.Item> f = MediaRepo.filter(items, query);
-                for (int i = 0; i < f.size(); i++) rows.add(Row.item(f.get(i), f, i, false));
                 break;
             }
             default:
@@ -627,7 +633,7 @@ public final class MainActivity extends Activity {
         }
         header.setText(title);
         adapter.set(rows);
-        boolean empty = rows.isEmpty() || (rows.size() == 1 && rows.get(0).back);
+        boolean empty = (rows.isEmpty() || (rows.size() == 1 && rows.get(0).back)) && !("playlists".equals(tab) && openList == null);
         emptyView.setVisibility(empty && scanned ? View.VISIBLE : View.GONE);
         emptyView.setText(Tr.t("empty"));
     }
@@ -651,6 +657,10 @@ public final class MainActivity extends Activity {
         static Row back() { Row r = new Row(); r.back = true; return r; }
         boolean grant;
         static Row grant() { Row r = new Row(); r.grant = true; return r; }
+        String owner, listName;
+        boolean newList;
+        static Row list(String name) { Row r = new Row(); r.listName = name; return r; }
+        static Row newList() { Row r = new Row(); r.newList = true; return r; }
     }
 
     private final class RowAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
@@ -680,11 +690,20 @@ public final class MainActivity extends Activity {
             t1.setEllipsize(TextUtils.TruncateAt.END);
             t2.setSingleLine(true);
             t2.setEllipsize(TextUtils.TruncateAt.END);
+            ImageView more = new ImageView(MainActivity.this);
+            more.setImageDrawable(new Icon("more", g.text));
+            more.setPadding(px(10), px(10), px(10), px(10));
+            more.setBackground(g.pill(type == 1 ? 0x66000000 : 0, px(20)));
+            more.setFocusable(true);
+            more.setClickable(true);
+            more.setContentDescription(Tr.t("f.more"));
+            if (type == 1) more.setImageDrawable(new Icon("more", 0xFFFFFFFF));
             if (type == 1) {
                 v.setOrientation(LinearLayout.VERTICAL);
                 v.setPadding(px(6), px(6), px(6), px(10));
                 FrameLayout thumbFrame = new FrameLayout(MainActivity.this);
                 thumbFrame.addView(img, new FrameLayout.LayoutParams(-1, -1));
+                thumbFrame.addView(more, new FrameLayout.LayoutParams(px(40), px(40), Gravity.TOP | Gravity.END));
                 v.addView(thumbFrame, new LinearLayout.LayoutParams(-1, px(118)));
                 t1.setPadding(px(4), px(8), px(4), 0);
                 t2.setPadding(px(4), px(2), px(4), 0);
@@ -702,8 +721,9 @@ public final class MainActivity extends Activity {
                 tx.addView(t1);
                 tx.addView(t2);
                 v.addView(tx, new LinearLayout.LayoutParams(0, -2, 1f));
+                v.addView(more, new LinearLayout.LayoutParams(px(44), px(44)));
             }
-            v.setTag(new View[]{img, t1, t2});
+            v.setTag(new View[]{img, t1, t2, more});
             return new RecyclerView.ViewHolder(v) { };
         }
 
@@ -712,6 +732,10 @@ public final class MainActivity extends Activity {
             View[] parts = (View[]) h.itemView.getTag();
             ImageView img = (ImageView) parts[0];
             TextView t1 = (TextView) parts[1], t2 = (TextView) parts[2];
+            View more = parts[3];
+            more.setVisibility(View.GONE);
+            more.setOnClickListener(null);
+            h.itemView.setOnLongClickListener(null);
             img.setTag(null);
             img.setBackground(g.pill(g.field(), px(10)));
             int pad = r.card ? px(30) : px(14);
@@ -731,6 +755,29 @@ public final class MainActivity extends Activity {
                 h.itemView.setOnClickListener(v -> { openFolder = null; refreshList(); });
                 return;
             }
+            if (r.newList) {
+                img.setImageDrawable(new Icon("plus", g.onAccent));
+                img.setBackground(g.pill(g.accent, px(10)));
+                t1.setText(Tr.t("pl.new"));
+                t2.setText(Tr.t("pl.newHint"));
+                h.itemView.setOnClickListener(v -> nameDialog(Tr.t("pl.new"), "", n -> {
+                    if (!prefs.createPlaylist(n)) { toast(Tr.t("pl.exists")); return; }
+                    refreshList();
+                }));
+                return;
+            }
+            if (r.listName != null) {
+                String n = r.listName;
+                img.setImageDrawable(new Icon(FAV.equals(n) ? "starFill" : RECENT.equals(n) ? "recent" : "queue", g.accent));
+                t1.setText(listTitle(n));
+                int count = FAV.equals(n) ? prefs.list("fav").size() : RECENT.equals(n) ? prefs.list("recent").size() : prefs.playlist(n).size();
+                t2.setText(String.format(Locale.getDefault(), Tr.t("items"), count));
+                h.itemView.setOnClickListener(v -> { openList = n; refreshList(); list.scrollToPosition(0); });
+                more.setVisibility(View.VISIBLE);
+                more.setOnClickListener(v -> listMenu(n));
+                h.itemView.setOnLongClickListener(v -> { listMenu(n); return true; });
+                return;
+            }
             if (r.folder != null) {
                 img.setImageDrawable(new Icon("folder", g.accent));
                 t1.setText(r.folder.name);
@@ -745,6 +792,9 @@ public final class MainActivity extends Activity {
             String dur = it.duration > 0 ? time(it.duration) : "";
             t2.setText(TextUtils.isEmpty(it.sub) ? dur : (dur.isEmpty() ? it.sub : dur + "  ·  " + it.sub));
             h.itemView.setOnClickListener(v -> play(r.queue, r.index));
+            more.setVisibility(View.VISIBLE);
+            more.setOnClickListener(v -> itemMenu(it, r.queue, r.index, r.owner));
+            h.itemView.setOnLongClickListener(v -> { itemMenu(it, r.queue, r.index, r.owner); return true; });
             if (it.id > 0 || it.path != null) {
                 img.setTag(it.uri);
                 io.execute(() -> {
@@ -929,6 +979,300 @@ public final class MainActivity extends Activity {
         MediaItem cur = controller.getCurrentMediaItem();
         Bundle ex = cur == null ? null : cur.mediaMetadata.extras;
         return ex != null && ex.getBoolean(PlaybackService.EXTRA_VIDEO) && t.getGroups().isEmpty();
+    }
+
+    // ------------------------------------------------------------------ playlists & file actions
+    private static final String FAV = "★fav", RECENT = "★recent";
+    private static final int REQ_DELETE = 41, REQ_WRITE = 42;
+    private String openList;                 // playlist being shown in the Playlists tab
+    private MediaRepo.Item pendingItem;      // waiting for Android's "allow?" answer
+    private String pendingNewName;
+
+    private String listTitle(String name) {
+        if (FAV.equals(name)) return Tr.t("favorites");
+        if (RECENT.equals(name)) return Tr.t("recent");
+        return name;
+    }
+
+    private List<MediaRepo.Item> listItems(String name) {
+        List<String[]> src = FAV.equals(name) ? prefs.list("fav") : RECENT.equals(name) ? prefs.list("recent") : prefs.playlist(name);
+        List<MediaRepo.Item> items = new ArrayList<>();
+        for (String[] r : src) {
+            MediaRepo.Item it = find(r[0]);
+            if (it == null && r.length > 3 && !r[3].isEmpty()) it = findPath(r[3]);
+            if (it == null) {
+                it = new MediaRepo.Item();
+                it.uri = r[0]; it.title = r[1]; it.sub = ""; it.video = "1".equals(r[2]);
+                it.path = r.length > 3 && !r[3].isEmpty() ? r[3] : null;
+            }
+            items.add(it);
+        }
+        return items;
+    }
+
+    private MediaRepo.Item findPath(String path) {
+        for (MediaRepo.Item i : repo.videos) if (path.equals(i.path)) return i;
+        for (MediaRepo.Item i : repo.music) if (path.equals(i.path)) return i;
+        return null;
+    }
+
+    private void itemMenu(MediaRepo.Item it, List<MediaRepo.Item> queue, int index, String owner) {
+        List<String> labels = new ArrayList<>();
+        List<Runnable> acts = new ArrayList<>();
+        labels.add("▶  " + Tr.t("a.play")); acts.add(() -> play(queue, index));
+        labels.add("＋  " + Tr.t("pl.addTo")); acts.add(() -> chooseList(it));
+        boolean fav = prefs.isFavorite(it.uri);
+        labels.add("★  " + Tr.t(fav ? "pl.unfav" : "pl.fav"));
+        acts.add(() -> { toast(Tr.t(prefs.toggleFavorite(it.uri, it.title, it.video) ? "addFav" : "removeFav")); refreshList(); });
+        if (owner != null && !RECENT.equals(owner)) {
+            labels.add("－  " + Tr.t("pl.removeFrom"));
+            acts.add(() -> {
+                if (FAV.equals(owner)) prefs.toggleFavorite(it.uri, it.title, it.video);
+                else prefs.removeFromPlaylist(owner, it.uri);
+                refreshList();
+            });
+        }
+        labels.add("✎  " + Tr.t("f.rename")); acts.add(() -> renameDialog(it));
+        labels.add("⇪  " + Tr.t("f.share")); acts.add(() -> shareItem(it));
+        labels.add("🗑  " + Tr.t("f.delete")); acts.add(() -> confirmDelete(it));
+        new AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+                .setTitle(it.title)
+                .setItems(labels.toArray(new String[0]), (d, w) -> acts.get(w).run())
+                .show();
+    }
+
+    private void chooseList(MediaRepo.Item it) {
+        List<String> names = prefs.playlistNames();
+        List<String> labels = new ArrayList<>();
+        labels.add("＋  " + Tr.t("pl.new"));
+        labels.addAll(names);
+        new AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+                .setTitle(Tr.t("pl.addTo"))
+                .setItems(labels.toArray(new String[0]), (d, w) -> {
+                    if (w == 0) nameDialog(Tr.t("pl.new"), "", n -> {
+                        if (!prefs.createPlaylist(n)) { toast(Tr.t("pl.exists")); return; }
+                        prefs.addToPlaylist(n, it.uri, it.title, it.video, it.path);
+                        toast(String.format(Tr.t("pl.added"), n));
+                        refreshList();
+                    });
+                    else {
+                        String n = names.get(w - 1);
+                        toast(prefs.addToPlaylist(n, it.uri, it.title, it.video, it.path)
+                                ? String.format(Tr.t("pl.added"), n) : Tr.t("pl.already"));
+                        refreshList();
+                    }
+                })
+                .show();
+    }
+
+    interface NameAction { void run(String name); }
+
+    private void nameDialog(String title, String current, NameAction then) {
+        EditText e = new EditText(this);
+        e.setSingleLine(true);
+        e.setText(current);
+        e.setSelectAllOnFocus(true);
+        FrameLayout box = new FrameLayout(this);
+        box.setPadding(px(20), px(8), px(20), 0);
+        box.addView(e);
+        AlertDialog d = new AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+                .setTitle(title)
+                .setView(box)
+                .setPositiveButton(Tr.t("ok"), (x, w) -> {
+                    String n = e.getText().toString().trim().replaceAll("[\\\\/:*?\"<>|]", " ").trim();
+                    if (n.isEmpty()) { toast(Tr.t("f.emptyName")); return; }
+                    then.run(n);
+                })
+                .setNegativeButton(Tr.t("dl.cancel"), null)
+                .create();
+        d.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
+        d.show();
+        e.requestFocus();
+    }
+
+    private void listMenu(String name) {
+        boolean user = !FAV.equals(name) && !RECENT.equals(name);
+        List<String> labels = new ArrayList<>();
+        List<Runnable> acts = new ArrayList<>();
+        labels.add("▶  " + Tr.t("playAll"));
+        acts.add(() -> { List<MediaRepo.Item> l = listItems(name); if (!l.isEmpty()) play(l, 0); });
+        if (user) {
+            labels.add("✎  " + Tr.t("pl.rename"));
+            acts.add(() -> nameDialog(Tr.t("pl.rename"), name, n -> {
+                if (!prefs.renamePlaylist(name, n)) { toast(Tr.t("pl.exists")); return; }
+                if (name.equals(openList)) openList = n;
+                refreshList();
+            }));
+            labels.add("🗑  " + Tr.t("pl.delete"));
+            acts.add(() -> new AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+                    .setTitle(Tr.t("pl.delete"))
+                    .setMessage(String.format(Tr.t("pl.deleteQ"), name))
+                    .setPositiveButton(Tr.t("f.delete"), (d, w) -> {
+                        prefs.deletePlaylist(name);
+                        if (name.equals(openList)) openList = null;
+                        refreshList();
+                    })
+                    .setNegativeButton(Tr.t("dl.cancel"), null).show());
+        }
+        new AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+                .setTitle(listTitle(name))
+                .setItems(labels.toArray(new String[0]), (d, w) -> acts.get(w).run())
+                .show();
+    }
+
+    private void shareItem(MediaRepo.Item it) {
+        try {
+            Uri u = Uri.parse(it.uri);
+            if (!"content".equals(u.getScheme())) { toast(Tr.t("f.cantShare")); return; }
+            Intent s = new Intent(Intent.ACTION_SEND).setType(it.video ? "video/*" : "audio/*")
+                    .putExtra(Intent.EXTRA_STREAM, u).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(Intent.createChooser(s, it.title));
+        } catch (Exception e) { toast(Tr.t("f.cantShare")); }
+    }
+
+    // ---- delete & rename (the file itself, on the phone)
+    /** Can we change the file directly, without asking Android for permission each time? */
+    private boolean direct(MediaRepo.Item it) {
+        if (it.path == null) return false;
+        if (Build.VERSION.SDK_INT <= 29) return true;
+        if (Environment.isExternalStorageManager()) return true;
+        return it.path.startsWith(YtDl.outDir().getAbsolutePath());   // our own downloads
+    }
+
+    private boolean needsLegacyWrite() {
+        return Build.VERSION.SDK_INT <= 28 && checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void confirmDelete(MediaRepo.Item it) {
+        new AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
+                .setTitle(Tr.t("f.delete"))
+                .setMessage(String.format(Tr.t("f.deleteQ"), it.title))
+                .setPositiveButton(Tr.t("f.delete"), (d, w) -> deleteItem(it))
+                .setNegativeButton(Tr.t("dl.cancel"), null)
+                .show();
+    }
+
+    private void deleteItem(MediaRepo.Item it) {
+        if (needsLegacyWrite()) { requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQ_PERMS + 1); return; }
+        stopIfPlaying(it);
+        if (direct(it)) {
+            java.io.File f = new java.io.File(it.path);
+            if (f.delete() || !f.exists()) {
+                try { if (it.id > 0) getContentResolver().delete(Uri.parse(it.uri), null, null); } catch (Exception ignored) { }
+                MediaScannerConnectionScan(it.path);
+                afterDelete(it);
+            } else toast(Tr.t("f.failed"));
+            return;
+        }
+        Uri u = Uri.parse(it.uri);
+        if (Build.VERSION.SDK_INT >= 30 && "content".equals(u.getScheme())) {
+            try {
+                android.app.PendingIntent pi = MediaStore.createDeleteRequest(getContentResolver(), java.util.Collections.singletonList(u));
+                pendingItem = it;
+                startIntentSenderForResult(pi.getIntentSender(), REQ_DELETE, null, 0, 0, 0);
+            } catch (Exception e) { toast(Tr.t("f.failed")); }
+            return;
+        }
+        toast(Tr.t("f.failed"));
+    }
+
+    private void afterDelete(MediaRepo.Item it) {
+        prefs.replaceEverywhere(it.uri, null, null, null);
+        repo.videos.remove(it);
+        repo.music.remove(it);
+        for (MediaRepo.Folder f : repo.folders) f.items.remove(it);
+        toast(Tr.t("f.deleted"));
+        refreshList();
+    }
+
+    private void renameDialog(MediaRepo.Item it) {
+        nameDialog(Tr.t("f.rename"), it.title, n -> renameItem(it, n));
+    }
+
+    private static String ext(String path) {
+        if (path == null) return "";
+        int dot = path.lastIndexOf('.'), slash = path.lastIndexOf('/');
+        return dot > slash ? path.substring(dot) : "";
+    }
+
+    private void renameItem(MediaRepo.Item it, String newName) {
+        if (needsLegacyWrite()) { requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQ_PERMS + 1); return; }
+        if (direct(it)) {
+            java.io.File f = new java.io.File(it.path);
+            java.io.File to = new java.io.File(f.getParentFile(), newName + ext(it.path));
+            if (to.exists()) { toast(Tr.t("f.exists")); return; }
+            stopIfPlaying(it);
+            if (!f.renameTo(to)) { toast(Tr.t("f.failed")); return; }
+            MediaScannerConnectionScan(f.getAbsolutePath());
+            MediaScannerConnectionScan(to.getAbsolutePath());
+            String newUri = it.id > 0 ? it.uri : Uri.fromFile(to).toString();
+            if (it.id > 0) {
+                try {
+                    android.content.ContentValues cv = new android.content.ContentValues();
+                    cv.put(MediaStore.MediaColumns.DISPLAY_NAME, to.getName());
+                    if (Build.VERSION.SDK_INT < 29) cv.put(MediaStore.MediaColumns.DATA, to.getAbsolutePath());
+                    getContentResolver().update(Uri.parse(it.uri), cv, null, null);
+                } catch (Exception ignored) { }
+            }
+            afterRename(it, newName, to.getAbsolutePath(), newUri);
+            return;
+        }
+        Uri u = Uri.parse(it.uri);
+        if (Build.VERSION.SDK_INT >= 30 && "content".equals(u.getScheme())) {
+            try {
+                android.app.PendingIntent pi = MediaStore.createWriteRequest(getContentResolver(), java.util.Collections.singletonList(u));
+                pendingItem = it;
+                pendingNewName = newName;
+                startIntentSenderForResult(pi.getIntentSender(), REQ_WRITE, null, 0, 0, 0);
+            } catch (Exception e) { toast(Tr.t("f.failed")); }
+            return;
+        }
+        toast(Tr.t("f.failed"));
+    }
+
+    private void renameThroughMediaStore(MediaRepo.Item it, String newName) {
+        try {
+            String file = newName + ext(it.path != null ? it.path : it.title);
+            android.content.ContentValues cv = new android.content.ContentValues();
+            cv.put(MediaStore.MediaColumns.DISPLAY_NAME, file);
+            stopIfPlaying(it);
+            int n = getContentResolver().update(Uri.parse(it.uri), cv, null, null);
+            if (n <= 0) { toast(Tr.t("f.failed")); return; }
+            String newPath = it.path == null ? null : new java.io.File(new java.io.File(it.path).getParentFile(), file).getAbsolutePath();
+            afterRename(it, newName, newPath, it.uri);
+        } catch (Exception e) { toast(Tr.t("f.failed")); }
+    }
+
+    private void afterRename(MediaRepo.Item it, String newName, String newPath, String newUri) {
+        prefs.replaceEverywhere(it.uri, newUri, newName, newPath);
+        it.title = newName;
+        it.path = newPath;
+        it.uri = newUri;
+        toast(Tr.t("f.renamed"));
+        refreshList();
+        ui.postDelayed(this::quietRescan, 1500);
+    }
+
+    private void stopIfPlaying(MediaRepo.Item it) {
+        if (controller == null) return;
+        MediaItem cur = controller.getCurrentMediaItem();
+        if (cur != null && it.uri.equals(cur.mediaId)) { controller.stop(); controller.clearMediaItems(); showPlayer(false); mini.setVisibility(View.GONE); }
+    }
+
+    private void MediaScannerConnectionScan(String path) {
+        try { android.media.MediaScannerConnection.scanFile(this, new String[]{path}, null, null); } catch (Exception ignored) { }
+    }
+
+    @Override protected void onActivityResult(int code, int result, Intent data) {
+        super.onActivityResult(code, result, data);
+        MediaRepo.Item it = pendingItem;
+        String name = pendingNewName;
+        pendingItem = null;
+        pendingNewName = null;
+        if (it == null) return;
+        if (result != RESULT_OK) { toast(Tr.t("f.notAllowed")); return; }
+        if (code == REQ_DELETE) afterDelete(it);
+        else if (code == REQ_WRITE && name != null) renameThroughMediaStore(it, name);
     }
 
     // ------------------------------------------------------------------ playback actions
