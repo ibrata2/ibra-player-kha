@@ -97,7 +97,7 @@ jobs:
             grep -n -A40 "FATAL EXCEPTION" shots/logcat.txt > shots/crash.txt || true
             grep -n -B2 -A30 "ANR in com.ibrata2" shots/logcat.txt >> shots/crash.txt || true
             echo "===== CRASHES ====="; cat shots/crash.txt
-            for f in shots/1-start.png shots/2-downloads.png shots/3-downloads-scrolled.png; do echo "=====SHOT $f"; convert "$f" -resize 400x -quality 60 jpg:- | base64 -w0; echo; echo "=====END"; done
+            for f in shots/1-start.png shots/2-downloads.png shots/3-downloads-scrolled.png; do echo "=====SHOT $f"; base64 -w0 "$f"; echo; echo "=====END"; done
       - uses: actions/upload-artifact@v4
         if: always()
         with:
