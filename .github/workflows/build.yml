@@ -97,12 +97,19 @@ jobs:
             grep -n -A40 "FATAL EXCEPTION" shots/logcat.txt > shots/crash.txt || true
             grep -n -B2 -A30 "ANR in com.ibrata2" shots/logcat.txt >> shots/crash.txt || true
             echo "===== CRASHES ====="; cat shots/crash.txt
-            for f in shots/1-start.png shots/2-downloads.png shots/3-downloads-scrolled.png; do echo "=====SHOT $f"; base64 -w0 "$f"; echo; echo "=====END"; done
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: emulator-test
           path: shots/
+      - name: Save screenshots to the ci-shots branch
+        if: always()
+        run: |
+          cd shots
+          git init -q -b ci-shots
+          git add *.png crash.txt 2>/dev/null || true
+          git -c user.name=ci -c user.email=ci@local commit -qm "screens ${{ github.sha }}" || exit 0
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" ci-shots
       - name: Fail if the app crashed
         run: |
           if [ -s shots/crash.txt ]; then
