@@ -97,7 +97,7 @@ jobs:
             sleep 4
             adb shell am start -n com.ibrata2.playerkha/com.ibrata2.player.MainActivity --es tab music
             sleep 3
-            adb shell input tap 1000 300
+            adb shell input tap 91 210
             sleep 4
             adb exec-out screencap -p > shots/5-music.png
             adb shell input swipe 540 420 540 420 900

@@ -502,6 +502,8 @@ public final class MainActivity extends Activity {
         LinearLayout top = new LinearLayout(this);
         top.setGravity(Gravity.CENTER_VERTICAL);
         header = text("", compact ? 20 : 24, g.text, true);
+        header.setSingleLine(true);
+        header.setEllipsize(TextUtils.TruncateAt.END);
         top.addView(header, new LinearLayout.LayoutParams(0, -2, 1f));
         search = new EditText(this);
         search.setHint(Tr.t("search"));
@@ -520,7 +522,7 @@ public final class MainActivity extends Activity {
             public void onTextChanged(CharSequence s, int a, int b, int c) { }
             public void afterTextChanged(Editable e) { query = e.toString(); refreshList(); }
         });
-        top.addView(search, new LinearLayout.LayoutParams(px(compact ? 200 : 280), px(compact ? 44 : 50)));
+        top.addView(search, new LinearLayout.LayoutParams(px(wDp < 400 ? 170 : compact ? 200 : 280), px(compact ? 44 : 50)));
         ImageButton rescan = iconButton("refresh", g.text, compact ? 44 : 50);
         rescan.setContentDescription(Tr.t("rescan"));
         rescan.setOnClickListener(v -> scan());
