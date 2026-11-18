@@ -1521,7 +1521,9 @@ public final class MainActivity extends Activity {
     private View siteTile(Object[] site, boolean big) {
         int color = (int) site[3];
         LinearLayout t = new LinearLayout(this);
-        t.setGravity(Gravity.CENTER_VERTICAL);
+        // big YouTube tile: icon + text side by side; small tiles: icon on top, name under it (never cut)
+        if (!big) t.setOrientation(LinearLayout.VERTICAL);
+        t.setGravity(big ? Gravity.CENTER_VERTICAL : Gravity.CENTER);
         t.setFocusable(true);
         t.setClickable(true);
         t.setPadding(px(big ? 16 : 10), px(big ? 12 : 8), px(12), px(big ? 12 : 8));
@@ -1540,13 +1542,15 @@ public final class MainActivity extends Activity {
         t.addView(badge, new LinearLayout.LayoutParams(bs, bs));
         LinearLayout tx = new LinearLayout(this);
         tx.setOrientation(LinearLayout.VERTICAL);
-        tx.setPadding(px(big ? 12 : 8), 0, px(2), 0);
+        tx.setPadding(px(big ? 12 : 0), px(big ? 0 : 6), px(big ? 2 : 0), 0);
+        if (!big) tx.setGravity(Gravity.CENTER_HORIZONTAL);
         TextView name = text((String) site[1], big ? 20 : 14, 0xFFFFFFFF, true);
-        name.setMaxLines(2);
+        name.setMaxLines(1);
+        if (!big) { name.setGravity(Gravity.CENTER); name.setTextAlignment(View.TEXT_ALIGNMENT_CENTER); }
         name.setEllipsize(TextUtils.TruncateAt.END);
         tx.addView(name);
         if (big) tx.addView(text(Tr.t("dl.ytSub"), 13, 0xE6FFFFFF, false));
-        t.addView(tx, new LinearLayout.LayoutParams(0, -2, 1f));
+        t.addView(tx, big ? new LinearLayout.LayoutParams(0, -2, 1f) : new LinearLayout.LayoutParams(-1, -2));
         if (big) {
             ImageView arrow = new ImageView(this);
             arrow.setImageDrawable(new Icon("download", 0xFFFFFFFF));
