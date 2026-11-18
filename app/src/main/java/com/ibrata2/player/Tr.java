@@ -165,6 +165,9 @@ final class Tr {
         p("updInstallFailed", "The update was not installed.", "لم يتم تثبيت التحديث.");
         p("updAllowInstall", "Allow Ibra Player Kha to install updates, then tap Update again.", "اسمح لـ Ibra Player Kha بتثبيت التحديثات، ثم اضغط تحديث مرة ثانية.");
         p("playback", "Playback", "التشغيل");
+        p("autoResume", "Play the last media by itself when the app opens", "تشغيل آخر فيديو أو أغنية وحدها عند فتح البرنامج");
+        p("stopClose", "Stop and close", "إيقاف وإغلاق");
+        p("stopped", "Stopped", "تم الإيقاف");
         p("resumeOnOpen", "Continue the last media when the app opens", "متابعة آخر ملف عند فتح البرنامج");
         p("rememberPos", "Remember the position of each file", "تذكّر موضع كل ملف");
         p("autoStart", "Start playing when the car turns on", "بدء التشغيل عند تشغيل السيارة");

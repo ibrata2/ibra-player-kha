@@ -48,6 +48,7 @@ final class Prefs {
             sp.edit().putString("session", o.toString()).apply();
         } catch (JSONException ignored) { }
     }
+    void clearSession() { sp.edit().remove("session").apply(); }
     JSONObject session() {
         try { return new JSONObject(sp.getString("session", "{}")); } catch (JSONException e) { return new JSONObject(); }
     }

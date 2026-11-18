@@ -571,7 +571,10 @@ public final class MainActivity extends Activity {
         mPrev.setOnClickListener(v -> act("previous"));
         miniPlay.setOnClickListener(v -> act("playPause"));
         mNext.setOnClickListener(v -> act("next"));
-        mini.addView(mPrev); mini.addView(miniPlay); mini.addView(mNext);
+        ImageButton mClose = iconButton("close", g.muted, compact ? 44 : 50);
+        mClose.setContentDescription(Tr.t("stopClose"));
+        mClose.setOnClickListener(v -> closePlayback());
+        mini.addView(mPrev); mini.addView(miniPlay); mini.addView(mNext); mini.addView(mClose);
         mini.setVisibility(View.GONE);
         LinearLayout.LayoutParams mlp = new LinearLayout.LayoutParams(-1, -2);
         mlp.topMargin = gap;
@@ -804,14 +807,10 @@ public final class MainActivity extends Activity {
         pFav = iconButton("star", g.text, btn);
         pFav.setOnClickListener(v -> toggleFavorite());
         pTop.addView(pFav);
-        TextClock clock = new TextClock(this);
-        clock.setFormat12Hour("h:mm");
-        clock.setFormat24Hour("HH:mm");
-        clock.setTextColor(g.text);
-        clock.setTextSize(compact ? 18 : 22);
-        clock.setTypeface(Typeface.DEFAULT_BOLD);
-        clock.setPadding(px(8), 0, 0, 0);
-        pTop.addView(clock);
+        ImageButton pClose = iconButton("close", g.text, btn);
+        pClose.setContentDescription(Tr.t("stopClose"));
+        pClose.setOnClickListener(v -> closePlayback());
+        pTop.addView(pClose);
         FrameLayout.LayoutParams tlp = new FrameLayout.LayoutParams(-1, -2, Gravity.TOP);
         tlp.setMargins(px(10), px(10), px(10), 0);
         playerPage.addView(pTop, tlp);
@@ -1070,7 +1069,8 @@ public final class MainActivity extends Activity {
         }
         refreshPlayerState();
         if (pendingViewUri != null) { playPendingUri(); return; }
-        if (controller.getMediaItemCount() == 0 && prefs.bool("resumeOnOpen", true)) restoreSession(pendingAutoplay || prefs.bool("resumeOnOpen", true));
+        // Nothing plays by itself when the app opens, unless the user turned that on in Settings.
+        if (controller.getMediaItemCount() == 0 && prefs.bool("autoResume", false)) restoreSession(true);
         pendingAutoplay = false;
     }
 
@@ -1086,6 +1086,18 @@ public final class MainActivity extends Activity {
         controller.prepare();
         controller.play();
         showPlayer(true);
+    }
+
+    /** Stop playing and forget the queue, so nothing comes back next time the app opens. */
+    private void closePlayback() {
+        if (controller != null) {
+            controller.stop();
+            controller.clearMediaItems();
+        }
+        prefs.clearSession();
+        showPlayer(false);
+        mini.setVisibility(View.GONE);
+        toast(Tr.t("stopped"));
     }
 
     private void restoreSession(boolean autoplay) {
@@ -1286,7 +1298,7 @@ public final class MainActivity extends Activity {
         theme.addView(chipRow(names, cur, i -> { prefs.setTheme(Glass.IDS[i]); rebuildKeepingTab(); }));
 
         LinearLayout play = section(col, Tr.t("playback"));
-        play.addView(toggle(Tr.t("resumeOnOpen"), "resumeOnOpen", true));
+        play.addView(toggle(Tr.t("autoResume"), "autoResume", false));
         play.addView(toggle(Tr.t("rememberPos"), "rememberPos", true));
         play.addView(toggle(Tr.t("keepScreen"), "keepScreen", true));
 
