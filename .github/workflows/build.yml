@@ -126,6 +126,9 @@ jobs:
             adb shell input tap 230 460
             sleep 2
             adb exec-out screencap -p > shots/10-delete-confirm.png
+            adb shell input tap 296 372
+            sleep 2
+            adb exec-out screencap -p > shots/11-deleted.png
             adb shell input keyevent KEYCODE_BACK
             adb shell am start -n com.ibrata2.playerkha/com.ibrata2.player.MainActivity --es tab playlists
             sleep 3

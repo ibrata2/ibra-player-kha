@@ -61,6 +61,11 @@ final class MediaRepo {
         // every reachable storage ourselves and add whatever it missed.
         for (File root : storageRoots(ctx)) walk(root, seen);
 
+        // names the user gave in the app win over the song's built-in title tag
+        Prefs prefs = new Prefs(ctx);
+        for (Item it : videos) { String t = prefs.titleFor(it.path); if (t != null) it.title = t; }
+        for (Item it : music) { String t = prefs.titleFor(it.path); if (t != null) it.title = t; }
+
         Collator col = Collator.getInstance(new Locale("ar"));
         Collections.sort(videos, (a, b) -> col.compare(a.title, b.title));
         Collections.sort(music, (a, b) -> col.compare(a.title, b.title));

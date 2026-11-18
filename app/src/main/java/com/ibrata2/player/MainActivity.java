@@ -1181,6 +1181,7 @@ public final class MainActivity extends Activity {
 
     private void afterDelete(MediaRepo.Item it) {
         prefs.replaceEverywhere(it.uri, null, null, null);
+        prefs.setTitleFor(it.path, null, null);
         repo.videos.remove(it);
         repo.music.remove(it);
         for (MediaRepo.Folder f : repo.folders) f.items.remove(it);
@@ -1248,6 +1249,7 @@ public final class MainActivity extends Activity {
 
     private void afterRename(MediaRepo.Item it, String newName, String newPath, String newUri) {
         prefs.replaceEverywhere(it.uri, newUri, newName, newPath);
+        prefs.setTitleFor(it.path, newPath, newName);
         it.title = newName;
         it.path = newPath;
         it.uri = newUri;

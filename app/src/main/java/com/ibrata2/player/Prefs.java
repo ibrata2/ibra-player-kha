@@ -48,6 +48,13 @@ final class Prefs {
             sp.edit().putString("session", o.toString()).apply();
         } catch (JSONException ignored) { }
     }
+    String titleFor(String path) { return path == null ? null : sp.getString("title:" + path, null); }
+    void setTitleFor(String oldPath, String newPath, String title) {
+        SharedPreferences.Editor e = sp.edit();
+        if (oldPath != null) e.remove("title:" + oldPath);
+        if (newPath != null && title != null) e.putString("title:" + newPath, title);
+        e.apply();
+    }
     void clearSession() { sp.edit().remove("session").apply(); }
     JSONObject session() {
         try { return new JSONObject(sp.getString("session", "{}")); } catch (JSONException e) { return new JSONObject(); }
