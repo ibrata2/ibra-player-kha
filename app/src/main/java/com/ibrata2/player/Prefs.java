@@ -21,7 +21,7 @@ final class Prefs {
 
     boolean arabic() { return sp.getBoolean("arabic", true); }
     void setArabic(boolean v) { sp.edit().putBoolean("arabic", v).apply(); }
-    String theme() { return sp.getString("theme", "red-black"); }
+    String theme() { return sp.getString("theme", "blue-silver"); }
     void setTheme(String v) { sp.edit().putString("theme", v).apply(); }
     boolean bool(String k, boolean def) { return sp.getBoolean(k, def); }
     void setBool(String k, boolean v) { sp.edit().putBoolean(k, v).apply(); }

@@ -25,7 +25,7 @@ final class Glass {
         this.onAccent = onAccent; this.border = border;
     }
 
-    static final String[] IDS = {"system", "red-white", "white", "black", "red-black", "clear"};
+    static final String[] IDS = {"blue-silver", "system", "red-white", "white", "black", "red-black", "clear"};
 
     /** Automatic: follows the device's night mode, with the Android 12+ system accent colour. */
     static Glass system(android.content.Context ctx) {
@@ -47,6 +47,8 @@ final class Glass {
 
     static Glass of(String id) {
         switch (id) {
+            case "blue-silver": return new Glass(id, true, 0xFF0B1424, 0xFF02040A, 0x3D2E9BFF, 0x30C8D2DE, 0xA00C1526,
+                    0xFFEEF4FF, 0xFF9DAAC0, 0xFF1E90FF, 0xFFFFFFFF, 0x7050AFFF);
             case "red-white": return new Glass(id, false, 0xFFFBF7F7, 0xFFE7DCDD, 0xE6FFFFFF, 0x46E3192B, 0x99FFFFFF,
                     0xFF1C1517, 0xFF6E5F62, 0xFFE3192B, 0xFFFFFFFF, 0xE0FFFFFF);
             case "white": return new Glass(id, false, 0xFFF4F5F8, 0xFFD9DCE3, 0xDCFFFFFF, 0x5AAAB4C8, 0x94FFFFFF,

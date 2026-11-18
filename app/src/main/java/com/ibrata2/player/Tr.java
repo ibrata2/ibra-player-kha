@@ -114,6 +114,7 @@ final class Tr {
         p("t.red-white", "Red & White Glass", "زجاجي أبيض وأحمر");
         p("t.white", "White Glass", "زجاجي أبيض");
         p("t.black", "Black Glass", "زجاجي أسود");
+        p("t.blue-silver", "Blue & Silver Glass", "زجاجي أزرق وفضي");
         p("t.red-black", "Red & Black Glass", "زجاجي أحمر وأسود");
         p("t.clear", "Clear Glass", "زجاجي شفاف");
         p("steering", "Steering wheel buttons", "أزرار الدركسون");
