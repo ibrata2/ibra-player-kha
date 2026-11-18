@@ -100,9 +100,14 @@ jobs:
             adb shell input tap 91 210
             sleep 4
             adb exec-out screencap -p > shots/5-music.png
-            adb shell input swipe 540 420 540 420 900
+            adb shell input tap 135 405
             sleep 2
             adb exec-out screencap -p > shots/6-item-menu.png
+            adb shell input keyevent KEYCODE_BACK
+            sleep 1
+            adb shell input swipe 600 405 600 405 1200
+            sleep 2
+            adb exec-out screencap -p > shots/6b-longpress.png
             adb shell input keyevent KEYCODE_BACK
             adb shell am start -n com.ibrata2.playerkha/com.ibrata2.player.MainActivity --es tab playlists
             sleep 3
